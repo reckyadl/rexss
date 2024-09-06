@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" href="css/pico.min.css">
+    <link rel="stylesheet" href="css/pico.colors.min.css">
+    <title>reXSS</title>
+  </head>
+  <body>
+    <main class="container">
+        <nav>
+            <ul>
+              <li><h2>reXSS</h2></li>
+            </ul>
+        </nav>
+    </main>
+
+    <main class="container-fluid">
+        <h6>Command</h6>
+        <input type="text" name="text" placeholder="https://example.com/home.php?id={payload}" aria-label="Text">
+        <button class="pico-background-slate-900">Run</button>
+    </main>
+
+        <article>
+          <header>
+            <p>
+              <strong>Console Log</strong>
+              <button class="contrast">Download Log</button>
+            </p>
+          </header>
+          <p>
+            We're excited to have you join us for our
+            upcoming event. Please arrive at the museum 
+            on time to check in and get started.
+          </p>
+        </article>
+    
+  </body>
+</html>
