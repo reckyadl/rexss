@@ -1,23 +1,21 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
-	"time" // Import package time untuk delay
+	"time"
 )
 
 var logs []string
 
 func main() {
-	// Serve static files
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("css"))))
-
-	// Handle other routes
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/run", handleRun)
 	http.HandleFunc("/download", handleDownload)
@@ -37,33 +35,33 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
     <title>reXSS</title>
     <style>
       .status-success {
-        background-color: #d4edda; /* Hijau muda */
-        color: #155724; /* Hijau gelap */
+        background-color: #d4edda;
+        color: #155724;
         padding: 10px;
         border: 1px solid #c3e6cb;
         border-radius: 5px;
         margin-bottom: 10px;
       }
       .status-error {
-        background-color: #f8d7da; /* Merah muda */
-        color: #721c24; /* Merah gelap */
+        background-color: #f8d7da;
+        color: #721c24;
         padding: 10px;
         border: 1px solid #f5c6cb;
         border-radius: 5px;
         margin-bottom: 10px;
       }
       .output {
-        background-color: #28a745;  /* Background hijau */
+        background-color: #28a745;
         padding: 10px;
         margin-top: 5px;
         margin-bottom: 5px;
-        display: inline-block;  /* Adjust width dynamically based on content */
+        display: inline-block;
         color: white;
-        border-radius: 5px;  /* Optional: Adds rounded corners */
-        white-space: pre-wrap;  /* Allows the text to wrap if too long */
+        border-radius: 5px;
+        white-space: pre-wrap;
       }
       pre {
-        white-space: pre-wrap; /* Memungkinkan baris baru dan spasi */
+        white-space: pre-wrap;
       }
     </style>
   </head>
@@ -77,19 +75,19 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
     </main>
 
     <main class="container-fluid">
-        <h6>Command</h6>
-        <form action="/run" method="post">
+        <h6>URL</h6>
+        <form action="/run" method="post" enctype="multipart/form-data">
             <input type="text" name="url" placeholder="https://example.com/home.php?id={payload}" aria-label="Text">
+            <br><br>
+            <label>Upload payload file:</label>
+            <input type="file" name="payload-file">
             <button type="submit" class="pico-background-slate-900">Run</button>
         </form>
     </main>
 
     <article>
       <header>
-        <p>
-          <strong>Console Log</strong>
-          <button id="download-log" class="contrast">Download Log</button>
-        </p>
+        <p><strong>Results</strong></p>
       </header>
       <pre>{{.Log}}</pre>
     </article>
@@ -121,20 +119,28 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		inputURL := r.FormValue("url")
 
-		if inputURL == "" {
+		// Process the uploaded file
+		file, _, err := r.FormFile("payload-file")
+		if err != nil {
+			http.Error(w, "Error reading file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Read payloads from the file
+		var payloads []string
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			payloads = append(payloads, scanner.Text())
+		}
+
+		if inputURL == "" || len(payloads) == 0 {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
 
-		payloads := []string{
-			"<script>alert('XSS');</script>",
-			"<img src=x onerror=alert('XSS')>",
-			"<svg/onload=alert('XSS')>",
-		}
-
 		var results []string
 		for _, payload := range payloads {
-			// Encode payload to be safely included in URL
 			encodedPayload := url.QueryEscape(payload)
 			testURL := strings.Replace(inputURL, "{payload}", encodedPayload, 1)
 
@@ -152,14 +158,13 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 
 			var statusClass string
 			var statusOutput string
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, _ := io.ReadAll(resp.Body)
 			bodyStr := string(body)
 
 			if resp.StatusCode == http.StatusOK {
-				if strings.Contains(bodyStr, "alert('XSS')") {
+				if strings.Contains(bodyStr, "alert") {
 					statusClass = "output"
-					statusOutput = fmt.Sprintf("<div class='%s'>XSS Injected Successfully! <script>alert('XSS');</script></div>", statusClass)
-					// If successful, inject alert script in the response
+					statusOutput = fmt.Sprintf("<div class='%s'>XSS Injected Successfully!</div>", statusClass)
 				} else {
 					statusClass = "output"
 					statusOutput = fmt.Sprintf("<div class='%s'>%d</div>", statusClass, resp.StatusCode)
